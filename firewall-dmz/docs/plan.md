@@ -1,116 +1,376 @@
-# Plano — Kathará (Firewall + DMZ + Defense in Depth)
-
-**Objetivo:** Criar um plano executável para transformar o laboratório-base `firewall-dmz` no Cyber Range da Task (topologia com r0, fw, LAN, DMZ, Internet, gerenciamento opcional), implementar Segurança de Perímetro, experimentos de controle em L2/L3/L4, proposta L7 e evidências para Defense in Depth — sem alterar ainda o código/regras além do plano.
-
-**Arquitetura:** O laboratório usa Kathará (Docker-based) com 6 nós (pc1, pc2, fw, r0, web, dns, adm opcional) interligados via `lab.conf` e `.startup`. A política de firewall será aplicada no nó `fw` (iptables/nftables) com filtragem stateful (New/Established/Related). A topologia já está parcialmente montada (`firewall-dmz/`); o plano mapeia as lacunas (regras de firewall ainda não configuradas) e define o ciclo de experimentos (antes → regra → depois).
-
-**Stack técnico:** Kathará, Linux namespace/Docker, `iptables` (ou `nftables` se disponível em `fw`), `tcpdump`, `ping`, `curl`, `netcat`, `wireshark-cli` (opcional). Endereçamento já definido no `lab.conf` (LAN 10.0.1.0/24, DMZ 10.0.2.0/24, MGMT 10.0.3.0/24, WAN 198.51.100.0/30).
-
-**Especificação de referência:** Documento da Task (figura de topologia + etapas de segurança, experimentos L2/L3/L4/L7, Defense in Depth, entregas, perguntas finais).
+# Plano de Execução — Laboratório Firewall + DMZ + Internet
 
 ---
 
-## Restrições globais
+## 1. Preparação e Validação da Topologia
 
-- Reutilizar `firewall-dmz/` como base; não renomear `lab.conf` sem necessidade.
-- Endereços trazidos da figura: r0 = `198.51.100.2/30` (bridged), fw = `198.51.100.1/30` (eth3), LAN gw = `10.0.1.1`, DMZ gw = `10.0.2.1`, mgmt gw = `10.0.3.1`. Hosts: pc1 `10.0.1.10`, pc2 `10.0.1.11`, web `10.0.2.10`, dns `10.0.2.11`, adm `10.0.3.10`.
-- Regra de primeiro princípio: **Default Deny** (bloquear por padrão) + **menor privilégio** (permitir apenas o necessário, com stateful).
-- Todos os experimentos devem gerar evidência simples: `tcpdump` / `ping` / `curl` antes e depois da regra, com prints de saída capturados em `evidencias/` (a ser criado no repo).
-- Não implementar L7 no laboratório (apenas pesquisar proposta e apresentar para discussão), conforme instrução da Task.
+### Objetivo
 
----
+Conhecer o laboratório disponibilizado pelo professor e garantir que a infraestrutura inicial está funcionando antes de implementar qualquer política de segurança.
 
-## Estrutura de arquivos a tocar (base existente → evolucionar)
+### Atividades
 
-- `firewall-dmz/lab.conf` → já existe; pode adicionar `adm` se necessário.
-- `firewall-dmz/fw.startup` → já tem interfaces; precisa receber regras `iptables`/`nftables`.
-- `firewall-dmz/r0.startup` → já tem rotas; validar acesso à Internet.
-- `firewall-dmz/pc1.startup` / `pc2.startup` / `web.startup` / `dns.startup` / `adm.startup` → validar rotas default e serviços (DNS, HTTP).
-- Criar `firewall-dmz/regras/` (ou `regras-iptables.md`) → organizar as regras com comentários por camada.
-- Criar `evidencias/` → antes/depois por experimento.
-- Criar `README.md` atualizado na raiz com política, experimentos e respostas.
+- Iniciar o laboratório no Kathará.
+- Identificar os dispositivos presentes na topologia:
+  - `r0`
+  - `fw`
+  - `pc1`
+  - `pc2`
+  - `web`
+  - `dns`
+  - rede de gerenciamento, caso utilizada.
 
----
+- Identificar as interfaces de cada dispositivo.
+- Conferir os endereços IP e gateways.
+- Conferir as rotas existentes.
+- Verificar o funcionamento do encaminhamento pelo firewall.
+- Confirmar que não existem regras restritivas implementadas pelo grupo.
 
-## Tarefas (checklist por etapa)
+### Validação da Baseline
 
-### Tarefa 1 — Confirmação da topologia e baseline de conectividade
+Realizar os testes iniciais para registrar o comportamento da rede antes das alterações:
 
-- [ ] Verificar `kathara lstart` roda sem falha com `lab.conf` atual.
-- [ ] Confirmar que `pc1` e `pc2` atingem Internet via `r0` (ping 8.8.8.8, curl).
-- [ ] Confirmar LAN → DMZ (`pc1` → `web` e `dns`) funciona.
-- [ ] Confirmar `web` (HTTP) e `dns` (DNS resolver) respondem corretamente.
-- [ ] Documentar baseline (`evidencias/01-baseline/`).
+- LAN → Internet;
+- LAN → DMZ;
+- acesso ao servidor Web;
+- acesso ao servidor DNS;
+- comunicação entre os demais segmentos que forem relevantes para a topologia.
 
-### Tarefa 2 — Política de Segurança de Perímetro no `fw`
+### Evidências
 
-- [ ] Criar arquivo `firewall-dmz/regras/perimetro.sh` com política stateful:
-  - LAN → Internet ✅ (ALLOW NEW,ESTABLISHED,RELATED)
-  - LAN → DMZ (Web/DNS) ✅
-  - Internet → Web (DMZ) ✅ (apenas portas 80/443, NEW)
-  - Internet → LAN ❌ DENY (NEW)
-  - DMZ → LAN (novo) ❌ DENY (NEW)
-  - Respostas de conexões já permitidas ✅ (ESTABLISHED,RELATED)
-- [ ] Aplicar regras no `fw.startup` (ou via `kathara exec fw` após start) e validar com `iptables -L -v -n`.
-- [ ] Testar cada fluxo e salvar prints `evidencias/02-perimetro/`.
+Registrar:
 
-### Tarefa 3 — Controle de camada L2 (Enlace / MAC)
+- estado inicial da topologia;
+- endereçamento utilizado;
+- resultados dos testes de conectividade;
+- eventuais problemas encontrados antes da implementação do firewall.
 
-- [ ] Identificar MAC de `pc2` (ex.: `ip link show eth0`).
-- [ ] Criar regra `iptables -A INPUT -m mac --mac-source <MAC_pc2> -j DROP` (e/ou `FORWARD`) no `fw`.
-- [ ] Comparar `pc1` (funciona) vs `pc2` (bloqueado) com `ping` e `tcpdump -i eth1` / `eth2`.
-- [ ] Responder investigação: MAC acompanha pacote só no mesmo segmento L2; roteadores substituem MAC de origem. O firewall `fw` vê o MAC original de `pc2` apenas nas interfaces LAN/DMZ (`eth1`/`eth2`), não na WAN (`eth3`).
-- [ ] Salvar `evidencias/03-l2/`.
+### Entregável
 
-### Tarefa 4 — Controle de camada L3 (Rede / IP e ICMP)
-
-- **4A — ICMP:** Criar regra bloqueando ICMP (ex.: `-p icmp -j DROP` ou `-p icmp --icmp-type echo-request -j DROP` entre redes). Demonstrar com `ping` + `tcpdump`. Explicar que bloqueio de ICMP não impede tráfego TCP/UDP, apenas descoberta de rede.
-- **4B — Destino IP proibido:** Escolher IP de controle no laboratório (ex.: criar `servidor-proibido` em outra rede ou usar IP fictício `10.99.99.99` via interface dummy). Criar regra `-d 10.99.99.99 -j DROP`. Demonstrar que acesso falha. Responder: bloquear IP é incompleto — domínios têm múltiplos IPs, um IP pode hospedar vários sites, CDNs alteram IPs; melhor combinar com filtros de domínio/proxy.
-- [ ] Salvar `evidencias/04-l3/`.
-
-### Tarefa 5 — Controle de camada L4 (Transporte / Portas)
-
-- [ ] Definir política anti-P2P: bloquear portas comuns de BitTorrent (ex.: TCP 6881-6889, UDP 6881-6889) e/ou 6969, 443 (opcional, mas cuidado com HTTPS legítimo — para demonstração usar portas de teste como 6881-6889).
-- [ ] Criar `regras/bitTorrent.sh` com `-p tcp --dport 6881:6889 -j DROP` e equivalente UDP.
-- [ ] Gerar tráfego de teste com `nc -vz <alvo> 6881` (antes e depois) para demonstrar bloqueio.
-- [ ] Responder investigação: bloquear portas não é suficiente — BitTorrent usa portas dinâmicas (DHT, uTP) e pode usar portas comuns (802, 443); precisa de inspeção de protocolo/stream ou NGFW.
-- [ ] Salvar `evidencias/05-l4/`.
-
-### Tarefa 6 — Proposta de controle L7 (Aplicação)
-
-- [ ] Pesquisar: DNS Filtering (OpenDNS/NextDNS), Proxy HTTP(S) com filtragem de URL (`squid`/`tinyproxy` + listas ACL), WAF (`modsecurity`/`nginx`), NGFW (com inspeção de aplicação, ex.: `Suricata` + `Snort` com regras de conteúdo, ou `pfSense`/`OPNsense` com layer-7).
-- [ ] Escolher uma proposta (recomendado: **DNS Filtering + Proxy com ACL por domínio/categoria**, como controle simples que pode ser simulado com `dnsmasq` + `squid` no `fw` ou `web`). Explicar brevemente como funciona (intercepta resolução DNS ou HTTP e compara contra lista de bloqueios/categorias).
-- [ ] Documentar proposta no `README.md` (seção L7) e preparar slides/note para discussão em aula; NÃO implementar no lab.
-- [ ] Salvar `evidencias/06-l7/` (pesquisa + explicação).
-
-### Tarefa 7 — Defense in Depth (análise arquitetural)
-
-- [ ] Revisar topologia completa: `fw` (perímetro) + `r0` (NAT/roteamento) + `DMZ` (segmentação) + `LAN` (isolada) + `regras` (filtragem) + `controles nos serviços` (ex.: `web` apenas HTTP/HTTPS, `dns` apenas 53, `adm` restrito).
-- [ ] Cenario: `web` (DMZ) comprometido → atacante acessa `pc1`/`pc2`?
-  - **Não diretamente** se `fw` bloqueia DMZ→LAN (NEW) e LAN→DMZ é permitido apenas para respostas.
-  - Mas se `fw` falhar (ex.: regra removida), ainda há: segmentação física (diferentes interfaces/bridges), NAT no `r0` (IP privado não exposto), controle nos serviços (ex.: `web` não tem shell aberto), possivelmente `adm` isolado.
-- [ ] Responder as 3 perguntas finais:
-  1. Quem pode se comunicar com quem? LAN ↔ Internet (sim, via fw); LAN ↔ DMZ (sim, para serviços públicos); Internet → DMZ Web (sim, para 80/443); Internet → LAN (não); DMZ → LAN (não, novas conexões); DMZ ↔ DMZ (sim, interno); LAN → LAN (sim, L2); MGMT → fw (sim, para gestão, restrito).
-  2. Que tipos permitidos/bloqueados? Estado de conexão (stateful) -> new/established/related. Permitido: HTTP/HTTPS da LAN para Internet; HTTP/HTTPS da Internet para DMZ; DNS; respostas. Bloqueado: ICMP inter-rede (opcional); BitTorrent (L4); MAC de `pc2`; IP proibido; novas conexões DMZ→LAN.
-  3. Se uma camada falhar? Se `fw` falhar: `r0` ainda faz NAT (não expõe LAN diretamente); `DMZ` ainda é rede separada (não há rota direta LAN↔DMZ sem `fw`); serviços `web`/`dns` podem ter ACLs locais; `adm` isolado pode limitar acesso; regras do host `web`/`dns` podem restringir conexões internas.
-- [ ] Documentar no `README.md`.
+**Baseline da rede funcionando e documentada.**
 
 ---
 
-## Entregáveis do plano (para quando o usuário aprovar execução)
+# 2. Planejamento da Política do Firewall
 
-- Repositório Git com `firewall-dmz/` evoluído.
-- `regras/` organizadas e comentadas (`perimetro.sh`, `l2-mac.sh`, `l3-icmp.sh`, `l3-ip-proibido.sh`, `l4-p2p.sh`).
-- `README.md` atualizado (política, experimentos, evidências, respostas às 3 perguntas, proposta L7, Defense in Depth).
-- `evidencias/` com antes/depois para L2, L3-A, L3-B, L4, baseline.
-- Se necessário, `docs/superpowers/plans/` (este arquivo) atualizado conforme avanços.
+### Objetivo
+
+Definir o comportamento esperado do firewall antes de começar a criar as regras.
+
+### Atividades
+
+Identificar:
+
+- quais redes podem se comunicar;
+- quais serviços precisam estar disponíveis;
+- quais acessos devem ser bloqueados;
+- quais conexões devem ser permitidas somente como resposta;
+- quais comunicações não são necessárias.
+
+### Política de Segurança
+
+Organizar uma matriz de comunicação semelhante à proposta na atividade:
+
+| Origem                           | Destino        | Política                |
+| -------------------------------- | -------------- | ----------------------- |
+| LAN                              | Internet       | Permitir                |
+| LAN                              | Web/DNS da DMZ | Permitir                |
+| Internet                         | Web da DMZ     | Permitir                |
+| Internet                         | LAN            | Bloquear                |
+| DMZ                              | LAN            | Bloquear novas conexões |
+| Respostas de conexões permitidas | Origem         | Permitir                |
+
+### Definições
+
+Também deverá ser definido:
+
+- política padrão do firewall;
+- quais conexões serão tratadas de forma stateful;
+- quais serviços precisam de exceções;
+- quais regras serão necessárias para cada comunicação.
+
+### Entregável
+
+**Matriz de comunicação e política de segurança do firewall.**
 
 ---
 
-## Observações / Riscos
+# 3. Implementação e Validação do Firewall
 
-- A base `firewall-dmz/` já tem interfaces configuradas; a regra de firewall deve ser aplicada no `fw.startup` para persistir entre `lstart`.
-- Captura de tráfego (`tcpdump`) deve ser feita no nó correto (`fw` para entre redes; `pc2` para origem). Em containers, `tcpdump` pode exigir privilégios (`--privileged` no Kathará, já comum).
-- L7 não será implementado, apenas pesquisado; manter documentação clara para discussão.
+### Objetivo
+
+Transformar a política definida na etapa anterior em regras reais no `fw`.
+
+### Atividades
+
+- Escolher a ferramenta disponível no laboratório (`iptables`, `nftables` etc.).
+- Organizar as regras de forma lógica.
+- Implementar a política de bloqueio padrão.
+- Implementar o tratamento das conexões estabelecidas.
+- Criar as liberações necessárias para:
+  - LAN → Internet;
+  - LAN → DMZ;
+  - Internet → Web;
+  - demais comunicações previamente definidas.
+
+- Criar os bloqueios necessários para:
+  - Internet → LAN;
+  - DMZ → LAN;
+  - outros acessos não autorizados.
+
+### Validação
+
+Após cada conjunto de regras:
+
+1. gerar o tráfego correspondente;
+2. verificar o comportamento;
+3. confirmar se a comunicação permitida continua funcionando;
+4. confirmar se a comunicação bloqueada deixa de funcionar;
+5. observar os contadores das regras quando necessário.
+
+### Organização
+
+As regras deverão ser organizadas e comentadas para permitir:
+
+- leitura;
+- manutenção;
+- reprodução do laboratório;
+- identificação da finalidade de cada regra.
+
+### Entregável
+
+**Conjunto de regras do firewall organizado, comentado e validado.**
 
 ---
+
+# 4. Experimentos de Filtragem por Camadas
+
+### Objetivo
+
+Demonstrar, por meio de experimentos, como o firewall pode tomar decisões utilizando informações de diferentes camadas da comunicação.
+
+Todos os experimentos deverão seguir o mesmo ciclo:
+
+> **Antes da regra → Implementação da regra → Depois da regra → Análise**
+
+Utilizar `tcpdump`, Wireshark ou outras ferramentas de observação quando necessário.
+
+---
+
+## 4.1 L2 — Bloqueio por MAC
+
+### Atividades
+
+- Identificar o endereço MAC de `pc2`.
+- Testar a comunicação de `pc2` antes da regra.
+- Criar uma regra para bloquear o tráfego associado ao MAC identificado.
+- Repetir o teste depois da regra.
+- Comparar o comportamento de `pc1` e `pc2`.
+
+### Questão de investigação
+
+Explicar:
+
+- se o MAC acompanha um pacote durante todo o caminho pela Internet;
+- em quais condições o firewall consegue visualizar o MAC original de `pc2`.
+
+### Evidência
+
+Registrar:
+
+- MAC utilizado;
+- teste antes;
+- regra implementada;
+- teste depois;
+- explicação do resultado.
+
+---
+
+## 4.2 L3 — ICMP
+
+### Atividades
+
+- Testar `ping` antes da regra.
+- Criar uma regra de bloqueio de ICMP.
+- Repetir o `ping`.
+- Utilizar captura de tráfego para observar o comportamento.
+
+### Questão de investigação
+
+Explicar:
+
+- o que acontece com o pacote ICMP;
+- em qual ponto o firewall interfere;
+- diferença entre permitir e bloquear esse protocolo.
+
+### Evidência
+
+Registrar:
+
+**Antes → Regra → Depois → Explicação**
+
+---
+
+## 4.3 L3 — Bloqueio por IP
+
+### Atividades
+
+- Escolher um endereço IP de destino para representar um recurso proibido.
+- Testar o acesso antes da regra.
+- Implementar o bloqueio do destino.
+- Repetir o acesso.
+- Registrar o resultado.
+
+### Questão de investigação
+
+Explicar por que o bloqueio de um único endereço IP pode não ser suficiente para controlar o acesso a um determinado site ou serviço.
+
+Considerar:
+
+- múltiplos endereços IP;
+- mudança de endereços;
+- CDNs;
+- hospedagem de vários serviços no mesmo IP;
+- outros fatores relevantes.
+
+### Evidência
+
+Registrar:
+
+- destino escolhido;
+- teste antes;
+- regra;
+- teste depois;
+- análise das limitações.
+
+---
+
+## 4.4 L4 — Bloqueio por TCP/UDP
+
+### Atividades
+
+- Escolher um serviço/porta para representar o cenário proposto.
+- Gerar tráfego antes da regra.
+- Criar o bloqueio da porta/protocolo.
+- Repetir o teste.
+- Observar o tráfego quando necessário.
+
+### Questão de investigação
+
+Explicar se bloquear portas é suficiente para impedir uma aplicação como BitTorrent.
+
+Considerar:
+
+- portas alternativas;
+- portas dinâmicas;
+- múltiplos protocolos;
+- possíveis mecanismos de evasão.
+
+### Evidência
+
+Registrar:
+
+**Antes → Regra → Depois → Explicação**
+
+---
+
+# 5. Investigação L7 e Defense in Depth
+
+## 5.1 Investigação L7
+
+### Objetivo
+
+Compreender mecanismos de segurança capazes de analisar informações da camada de aplicação.
+
+### Atividades
+
+Escolher **uma** tecnologia para pesquisa, por exemplo:
+
+- DNS Filtering;
+- Proxy;
+- WAF;
+- Application Firewall;
+- NGFW.
+
+### A pesquisa deverá apresentar
+
+- o que é a tecnologia;
+- como funciona;
+- em que ponto da arquitetura pode ser utilizada;
+- quais informações consegue analisar;
+- que tipo de controle permite;
+- diferença em relação ao controle baseado somente em IP e porta;
+- limitações da abordagem.
+
+### Importante
+
+A implementação de L7 **não é obrigatória nesta Task**.
+
+### Entregável
+
+**Breve pesquisa documentada no README.**
+
+---
+
+## 5.2 Defense in Depth
+
+### Objetivo
+
+Analisar o funcionamento conjunto das diferentes camadas de segurança da arquitetura.
+
+### Cenário
+
+Considerar:
+
+> O servidor Web da DMZ foi comprometido.
+
+### Atividades
+
+Analisar se esse comprometimento permitiria automaticamente acesso a:
+
+- `pc1`;
+- `pc2`;
+- demais recursos da LAN.
+
+Identificar quais controles ainda poderiam limitar o atacante:
+
+- firewall;
+- DMZ;
+- segmentação de redes;
+- regras de filtragem;
+- controles dos próprios serviços.
+
+### Entregável
+
+**Explicação de como as diferentes camadas contribuem para o princípio de Defense in Depth.**
+
+---
+
+# 6. Organização e Entrega
+
+### Objetivo
+
+Consolidar todo o trabalho em um único repositório organizado.
+
+### Estrutura sugerida
+
+```text
+laboratorio-firewall-dmz/
+│
+├── README.md
+│
+├── firewall/
+│   ├── rules.sh
+│   └── README.md
+│
+├── evidencias/
+│   ├── baseline/
+│   ├── l2/
+│   ├── l3/
+│   └── l4/
+│
+└── pesquisa/
+    └── l7.md
+```
+
+> A estrutura pode ser adaptada conforme os arquivos que realmente forem necessários no laboratório.
