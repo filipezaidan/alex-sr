@@ -1,5 +1,26 @@
+# interfaces
 ifconfig eth0 10.0.1.1/24
 ifconfig eth1 10.0.2.1/24
 ifconfig eth2 10.0.3.1/24
 ifconfig eth3 198.51.100.1/30
+
+#  route r0 
 route add default gw 198.51.100.2
+
+
+#Firewall perimetro
+
+# permite as respostas de conexões que já foram iniciadas e estão sendo estabelecidas.
+iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# permite conexões originadas na LAN para a Internet
+iptables -A FORWARD -i eth0 -o eth3 -m conntrack --ctstate NEW -j ACCEPT
+
+# permite conexões originadas na LAN para a DMZ
+iptables -A FORWARD -i eth0 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
+
+# permite conexões originadas na Internet para a Web da DMZ
+iptables -A FORWARD -i eth3 -o eth1 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
+
+#Politica padrao: bloquear todo resto
+iptables -P FORWARD DROP
