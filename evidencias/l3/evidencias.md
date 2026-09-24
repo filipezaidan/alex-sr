@@ -1,123 +1,136 @@
-# Relatório de Evidências — Task 3: Controles em Camada 3 (L3)
+# Relatório de Evidências — Controles em Camada 3 (L3)
 
-**Objetivo:** Implementar e validar regras de firewall baseadas em protocolos da camada de rede (ICMP) e endereçamento IP de destino, demonstrando o efeito com `ping` e `tcpdump`.
+**Objetivo:** Implementar e validar regras de firewall baseadas no protocolo ICMP e no endereço IP de destino, demonstrando o efeito com `ping` e `tcpdump`.
+
+As regras deste experimento foram inseridas ao vivo com `iptables -I`. Elas não estão no `fw.startup`. Ao recriar o laboratório, só a política de perímetro volta a existir.
 
 ---
 
-## Experimento A — Bloqueio de Tráfego ICMP
+## Experimento A — Bloqueio de ICMP
 
-### 1. Teste Prévia (Antes da Regra)
+### 1. Antes da regra
 
-No host `pc1` (`10.0.1.10`), validamos a conectividade ICMP para a DMZ (`10.0.2.10`):
+No `pc1` (`10.0.1.10`):
 
 ```bash
 ping -c 4 10.0.2.10
 ```
 
-- **Resultado esperado:** 0% de perda de pacotes.
+O `web` respondeu aos 4 pacotes, com 0% de perda. Nessa hora a política de perímetro ainda aceitava ICMP novo da LAN para a DMZ (`eth0 → eth1`).
 
-### 2. Aplicação da Regra no Firewall (`fw`)
+### 2. Regra
 
-Bloqueamos o tráfego ICMP vindo da LAN (`eth0`) com destino à DMZ (`eth1`):
+No `fw`, a regra entrou no topo da cadeia `FORWARD`, antes dos `ACCEPT` do perímetro:
 
 ```bash
 iptables -I FORWARD 1 -i eth0 -o eth1 -p icmp -j DROP
-```
-
-Verificação no firewall:
-
-```bash
 iptables -L FORWARD -n -v --line-numbers
 ```
 
-### 3. Validação com `tcpdump` e `ping`
+A listagem mostrou a regra 1 como `DROP` de ICMP em `eth0 → eth1`. O contador ainda estava em 0 porque essa consulta foi feita antes do `ping` bloqueado.
 
-- **No `fw` (Terminal 1 - Escuta na interface de entrada `eth0`):**
-  ```bash
-  tcpdump -ni eth0 icmp
-  ```
-- **No `fw` (Terminal 2 - Escuta na interface de saída `eth1`):**
-  ```bash
-  tcpdump -ni eth1 icmp
-  ```
-- **No `pc1` (Geração de tráfego):**
-  ```bash
-  ping -c 4 10.0.2.10
-  ```
+### 3. Depois da regra
 
-**Resultado Observado:**
+No `fw`, em dois terminais:
 
-- **`pc1`:** 100% de perda de pacotes (`packet loss`).
-- **`tcpdump` na `eth0`:** Exibe as requisições `ICMP echo request` chegando da LAN.
-- **`tcpdump` na `eth1`:** Nenhum pacote é registrado, comprovando o descarte no firewall antes do encaminhamento.
+```bash
+tcpdump -ni eth0 icmp
+tcpdump -ni eth1 icmp
+```
+
+No `pc1`:
+
+```bash
+ping -c 4 10.0.2.10
+```
+
+O segundo `ping` enviou 4 pacotes, recebeu 0 e terminou com 100% de perda.
+
+![Ping do pc1 para a DMZ antes e depois do bloqueio de ICMP](pc1-a.png)
+
+O `tcpdump` na `eth0` registrou os quatro `ICMP echo request` de `10.0.1.10` para `10.0.2.10`. O `tcpdump` na `eth1` não registrou nenhum pacote.
+
+![Echo requests na eth0 e regra de ICMP](fw-a-1.png)
+
+![eth1 sem pacotes ICMP](fw-a-2.png)
+
+O pacote chega pela LAN, casa com a regra 1 e é descartado dentro do `fw`. A DMZ não recebe o echo request e por isso não há echo reply.
+
+### 4. Respostas da investigação
+
+**O que acontece com o pacote ICMP?** O echo request sai do `pc1` e entra no `fw` pela `eth0`. A regra de ICMP o descarta. O `pc1` não recebe resposta e o `ping` contabiliza perda total.
+
+**Em que ponto o firewall interfere?** Na cadeia `FORWARD`, entre a interface de entrada da LAN (`eth0`) e a interface de saída da DMZ (`eth1`). A captura na `eth0` vê o pacote. A captura na `eth1` não vê. O descarte ocorre antes do encaminhamento para a DMZ.
+
+**Qual a diferença entre permitir e bloquear?** Sem a regra, o ICMP novo da LAN para a DMZ casa com o `ACCEPT` de `eth0 → eth1` e a resposta volta por `ESTABLISHED,RELATED`. Com a regra no topo, só o ICMP nesse sentido é descartado. A regra não cobre outros protocolos nem o ICMP que sai pela `eth3` em direção à Internet.
 
 ---
 
-## Experimento B — Bloqueio por IP de Destino
+## Experimento B — Bloqueio por IP de destino
 
-### 1. Seleção do Destino e Teste Prévio
+O destino escolhido foi `8.8.8.8`, como recurso externo proibido. A regra de ICMP do experimento A não estava mais na tabela.
 
-Selecionamos o IP de destino de teste (exemplo: `8.8.8.8` representando um destino externo restrito).
+### 1. Antes da regra
 
-No host `pc1`:
+No `pc1`:
 
 ```bash
 ping -c 4 8.8.8.8
 ```
 
-- **Resultado esperado:** Resposta normal (0% packet loss).
+Os 4 pacotes foram recebidos, com 0% de perda.
 
-### 2. Aplicação da Regra no Firewall (`fw`)
+### 2. Regra
 
-Inserimos a regra para descartar qualquer pacote vindo da LAN (`eth0`) direcionado ao IP restrito:
+No `fw`:
 
 ```bash
 iptables -I FORWARD 1 -i eth0 -d 8.8.8.8 -j DROP
 ```
 
-Conferência das regras ativas:
+Qualquer protocolo vindo da LAN com esse destino é descartado. Os demais destinos continuam nas regras de perímetro.
+
+### 3. Depois da regra
+
+No `pc1`:
 
 ```bash
-iptables -L FORWARD -n -v --line-numbers
+ping -c 4 8.8.8.8
 ```
 
-### 3. Teste Posterior e Análise de Contadores
+O segundo `ping` enviou 4 pacotes, recebeu 0 e terminou com 100% de perda.
 
-- **No `pc1` (Tentativa de acesso ao IP bloqueado):**
+![Ping do pc1 para 8.8.8.8 antes e depois do bloqueio](pc1-b.png)
 
-  ```bash
-  ping -c 4 8.8.8.8
-  ```
+No `fw`, a mesma regra passou de 0 para 4 pacotes e 336 bytes:
 
-  - **Resultado:** Bloqueado (100% packet loss).
+```text
+1    4   336  DROP  ... eth0  *  destination 8.8.8.8
+```
 
-- **No `pc1` (Teste de acesso a outro IP permitido para isolamento do teste):**
+![Regra de destino 8.8.8.8 com 4 pacotes descartados](fw-b.png)
 
-  ```bash
-  ping -c 4 10.0.2.10
-  ```
+### 4. Isolamento do bloqueio
 
-  - **Resultado:** Conectividade normal.
+Com a regra de `8.8.8.8` ainda ativa, no `pc1`:
 
-- **No `fw` (Checagem de contadores):**
-  ```bash
-  iptables -L FORWARD -n -v --line-numbers
-  ```
+```bash
+ping -c 4 10.0.2.10
+```
 
-  - **Resultado:** O contador da regra de bloqueio do IP `8.8.8.8` incrementa os pacotes descartados.
+Esse destino não casa com `-d 8.8.8.8`. O pacote segue para a permissão LAN → DMZ e o `web` responde.
 
----
+![Ping para a DMZ com 8.8.8.8 bloqueado](pc1-b-dmz.png)
 
-## Resposta à Investigação L3
+O bloqueio é o endereço de destino, não a saída da LAN para a Internet nem o acesso à DMZ.
 
-**Pergunta:** Bloquear o endereço IP é uma boa solução para impedir o acesso a determinado site?
+### 5. Por que bloquear um IP não impede um site
 
-**Resposta:**
-**Não é uma solução definitiva nem suficiente para a web moderna.** O bloqueio por IP apresenta limitações críticas:
+Bloquear `8.8.8.8` impede aquele endereço. Um site real não é um único IP.
 
-1. **Múltiplos IPs por Domínio:** Grandes sites usam DNS Round Robin, Anycast ou múltiplos servidores. Um único domínio (ex: `google.com`) possui dezenas de endereços IP alternativos.
-2. **Hospedagem Compartilhada (Multi-tenant):** Vários sites diferentes podem compartilhar o mesmo endereço IP público (através de suporte a Virtual Hosts / TLS SNI). Bloquear o IP de um site malicioso pode derrubar dezenas de sites legítimos hospedados no mesmo servidor.
-3. **Redes de Distribuição de Conteúdo (CDNs):** Serviços como Cloudflare e Akamai alteram e alternam dinamicamente os endereços IP dos servidores de borda.
-4. **Fácil Contorno:** Mudanças na infraestrutura do serviço ou alteração de registros DNS tornam a regra de IP obsoleta rapidamente.
+- Um domínio pode ter muitos endereços ao mesmo tempo, por DNS round robin, anycast ou vários servidores.
+- Esses endereços mudam. Uma alteração de DNS deixa a regra obsoleta.
+- Uma CDN, como Cloudflare ou Akamai, troca o IP da borda e vários clientes compartilham os mesmos endereços.
+- Vários sites podem estar no mesmo IP, por hospedagem compartilhada e nome indicado no HTTP ou no TLS (SNI). Bloquear o IP de um serviço também bloqueia os outros que usam esse endereço.
 
-Por essas razões, o controle eficiente de acesso a sites exige mecanismos de **Camada 7 (Aplicação)**, como **DNS Filtering**, **Proxy HTTP/HTTPS** ou **Next-Generation Firewalls (NGFW)**.
+Por isso o controle de um site pelo nome pede inspeção de camada de aplicação, como filtro de DNS, proxy HTTP/HTTPS ou um firewall de próxima geração. Isso fica fora da implementação desta task.
