@@ -9,7 +9,7 @@ A política aplicada foi:
 
 - LAN → Internet: permitir
 - LAN → DMZ: permitir
-- Internet → Web da DMZ permitir
+- Internet → Web da DMZ: permitir
 - Internet → LAN: bloquear
 - DMZ → LAN: bloquear novas conexões
 - Respostas de conexões permitidas: permitir
@@ -59,64 +59,84 @@ Mapeamento das interfaces:
 
 ## 3. Evidência da política padrão
 
-Comando utilizado:
+Comando utilizado no `fw`:
 
 ```bash
 iptables -L FORWARD -n -v --line-numbers
 ```
 
-Saída observada:
+A cadeia `FORWARD` está com política `DROP` e somente quatro regras de
+`ACCEPT`. Nessa captura, o contador da política ainda estava em 0 pacotes:
+os testes de bloqueio foram feitos depois.
 
-```text
-Chain FORWARD (policy DROP 0 packets, 0 bytes)
-```
+![Política DROP e regras da cadeia FORWARD](firewall-policy-drop.png)
 
-Isso comprova que o firewall utiliza uma política de bloqueio por padrão.
-Somente os tráfegos explicitamente autorizados pelas regras podem atravessar
-a cadeia `FORWARD`.
+Somente os tráfegos que casam com uma dessas regras atravessam o firewall.
 
 ---
 
 ## 4. Evidência — LAN → DMZ
 
-Foi realizada uma tentativa de comunicação do `pc1` (LAN) para o servidor
-`web` da DMZ (`10.0.2.10`).
-
-Teste utilizado:
+No `pc1` (`10.0.1.10`), a LAN alcançou os dois hosts da DMZ:
 
 ```bash
 ping -c 4 10.0.2.10
+ping -c 4 10.0.2.11
 ```
 
-A comunicação foi permitida.
+Os dois testes receberam 4 respostas e terminaram com 0% de perda. O
+`10.0.2.10` é o `web` e o `10.0.2.11` é o `dns`.
 
-A regra correspondente no firewall:
+![Ping do pc1 para web e dns](<lan-dmz(web+dns).png>)
+
+A regra correspondente é a de sessão nova da LAN para a DMZ:
 
 ```text
 eth0 → eth1   ctstate NEW
 ```
 
-registrou tráfego.
-
-Na verificação dos contadores:
+Na verificação dos contadores, essa regra registrou o primeiro pacote da
+conversa:
 
 ```text
 3        1    84  ACCEPT  ... eth0  eth1 ... ctstate NEW
 ```
 
-Isso demonstra que uma nova conexão originada na LAN foi aceita em direção
-à DMZ.
-
-> Observação: como o serviço Web ainda não havia sido configurado nesta
-> etapa, o teste de conectividade foi realizado com `ping`. O teste HTTP
-> (`curl http://10.0.2.10`) pode ser realizado posteriormente quando o
-> serviço Web estiver configurado.
+O acesso ao `dns` foi comprovado por alcance ICMP ao host. Não houve consulta
+de nome, porque o `dns.startup` só configura o endereço IP.
 
 ---
 
-## 5. Evidência — Respostas de conexões permitidas
+## 5. Evidência — LAN → Internet
 
-Foi comparada a contagem de pacotes antes e depois do teste.
+No `pc1`:
+
+```bash
+ping 8.8.8.8
+curl https://example.com
+```
+
+O `ping` terminou com 0% de perda (3 pacotes enviados e 3 recebidos). O
+`curl` recebeu o HTML de `example.com`.
+
+![Ping e curl do pc1 para a Internet](lan-internet.png)
+
+A regra correspondente é:
+
+```text
+eth0 → eth3   ctstate NEW
+```
+
+No estado final do firewall, essa regra aparece com 1 pacote e 84 bytes. O
+primeiro pacote da sessão entra como `NEW`; o restante do `ping` e o `curl`
+seguem pela regra `ESTABLISHED,RELATED`.
+
+---
+
+## 6. Evidência — Respostas de conexões permitidas
+
+Foi comparada a contagem de pacotes antes e depois do `ping` do `pc1` para
+`10.0.2.10`.
 
 ### Antes
 
@@ -132,123 +152,125 @@ Foi comparada a contagem de pacotes antes e depois do teste.
 3        1    84  ACCEPT  ... eth0  eth1 ... ctstate NEW
 ```
 
-A regra `ESTABLISHED,RELATED` passou de `0` para `7` pacotes e `588` bytes.
+A regra `ESTABLISHED,RELATED` passou de 0 para 7 pacotes e 588 bytes. O
+`ping` no `pc1` recebeu as 4 respostas (0% de perda).
 
-Isso demonstra o funcionamento do filtro stateful: depois que uma conexão
-permitida é iniciada pela LAN, os pacotes de resposta pertencentes àquela
-conexão são reconhecidos pelo `conntrack` como `ESTABLISHED` ou `RELATED` e
-são aceitos.
+![Contadores antes e depois do ping LAN para DMZ](respostar-conexoes-permitidas.png)
 
-A evidência também mostra que não foi necessária uma regra genérica
-permitindo novas conexões da DMZ para a LAN.
+O filtro é stateful: depois que a LAN abre a conexão, o `conntrack` classifica
+os pacotes de volta como `ESTABLISHED` ou `RELATED` e a regra 1 os aceita.
+Não existe regra genérica permitindo novas conexões da DMZ para a LAN.
 
 ---
 
-## 6. Evidência — Internet → Web da DMZ
+## 7. Evidência — Internet → Web da DMZ
 
-A política permite conexões novas vindas da WAN somente para TCP/80:
-
-```text
-eth3 → eth1   tcp dpt:80   ctstate NEW
-```
-
-Regra correspondente:
+A política só libera sessão nova vinda da WAN quando o destino é TCP/80 na
+DMZ:
 
 ```bash
-iptables -A FORWARD -i eth3 -o eth1   -p tcp --dport 80   -m conntrack --ctstate NEW -j ACCEPT
+iptables -A FORWARD -i eth3 -o eth1 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
 ```
 
-O contador dessa regra deve aumentar quando uma conexão HTTP for iniciada
-a partir da rede externa.
+No `web` foi iniciado um servidor HTTP temporário, porque o `web.startup` só
+configura o IP:
+
+```bash
+python3 -m http.server 80
+```
+
+No `r0` (`198.51.100.2`):
+
+```bash
+curl -I --max-time 5 http://10.0.2.10
+```
+
+O resultado foi `HTTP/1.0 200 OK`. O log do `web` registrou
+`HEAD / HTTP/1.1` com status 200, originado em `198.51.100.2`.
+
+No `fw`, a regra 4 saiu de 0 e passou a 1 pacote e 60 bytes:
+
+```text
+4        1    60  ACCEPT  ... eth3  eth1 ... tcp dpt:80 ctstate NEW
+```
+
+![HTTP do r0 para o web e contador da regra 4](internet-web.png)
 
 ---
 
-## 7. Evidência — Internet → LAN
+## 8. Evidência — Internet → LAN
 
-Não existe uma regra `NEW` permitindo:
-
-```text
-eth3 → eth0
-```
-
-Portanto, novas conexões originadas na WAN com destino à LAN não possuem
-regra de aceitação e são descartadas pela política padrão:
-
-```text
-FORWARD (policy DROP)
-```
-
-Teste previsto:
+Não existe regra `NEW` para `eth3 → eth0`. No `r0`:
 
 ```bash
 ping -c 4 10.0.1.10
 ```
 
-ou, caso exista um serviço TCP no `pc1`:
+O resultado foi 4 pacotes enviados, 0 recebidos e 100% de perda.
+
+![Ping do r0 para o pc1 bloqueado](r0-lan.png)
+
+O mesmo teste aparece de novo no topo do terminal do `r0` em
+`internet-web.png`. Esses pacotes caem na política `DROP`.
+
+---
+
+## 9. Evidência — DMZ → LAN
+
+Não existe regra `NEW` para `eth1 → eth0`. No `web`:
 
 ```bash
-nc -vz -w 3 10.0.1.10 <porta>
+ping -c 4 10.0.1.10
 ```
 
-O resultado esperado é falha/bloqueio da conexão.
+O resultado foi 4 pacotes enviados, 0 recebidos e 100% de perda.
+
+![Ping do web para o pc1 bloqueado](<dmz(web)-lan(pc1).png>)
+
+A regra `ESTABLISHED,RELATED` não abre esse caminho. Ela só devolve tráfego
+de uma conexão que já foi autorizada, como a resposta a um acesso iniciado
+pela LAN.
 
 ---
 
-## 8. Evidência — DMZ → LAN
+## 10. Estado final do firewall
 
-Também não existe uma regra `NEW` permitindo:
+Depois dos testes de bloqueio e do HTTP a partir do `r0`, a cadeia `FORWARD`
+no `fw` ficou assim:
 
 ```text
-eth1 → eth0
+Chain FORWARD (policy DROP 8 packets, 672 bytes)
+num   pkts bytes target   prot  in    out    observação
+1       31  2522 ACCEPT   all   *     *      ctstate RELATED,ESTABLISHED
+2        1    84 ACCEPT   all   eth0  eth3   ctstate NEW
+3        2   168 ACCEPT   all   eth0  eth1   ctstate NEW
+4        1    60 ACCEPT   tcp   eth3  eth1   tcp dpt:80 ctstate NEW
 ```
 
-Assim, novas conexões iniciadas por servidores da DMZ em direção à LAN
-são bloqueadas pela política padrão `DROP`.
+Os 8 pacotes e 672 bytes da política `DROP` coincidem com os dois pings
+bloqueados de 4 pacotes cada um (Internet → LAN e DMZ → LAN). As quatro
+regras de `ACCEPT` têm contador maior que zero: respostas, LAN → Internet,
+LAN → DMZ e Internet → Web na porta 80.
 
-A regra `ESTABLISHED,RELATED` não contradiz essa proteção: ela permite
-somente tráfego pertencente a conexões que já foram autorizadas e
-estabelecidas, como respostas a conexões iniciadas pela LAN.
+A listagem completa está na parte de baixo de `internet-web.png`.
 
 ---
 
-## 9. Estado final do firewall
-
-A verificação final foi realizada com:
-
-```bash
-iptables -L FORWARD -n -v --line-numbers
-```
-
-Estado observado:
-
-```text
-Chain FORWARD (policy DROP 0 packets, 0 bytes)
-num   pkts bytes target     prot opt in     out     source      destination
-1       7    588 ACCEPT     0    --  *      *       ...         ...  ctstate RELATED,ESTABLISHED
-2       0      0 ACCEPT     0    --  eth0   eth3     ...         ...  ctstate NEW
-3       1     84 ACCEPT     0    --  eth0   eth1     ...         ...  ctstate NEW
-4       0      0 ACCEPT     6    --  eth3   eth1     ...         ...  tcp dpt:80 ctstate NEW
-```
-
-Os contadores confirmam que houve tráfego pela regra de respostas
-`ESTABLISHED,RELATED` e pela regra LAN → DMZ.
-
----
-
-## 10. Conclusão
+## 11. Conclusão
 
 A configuração implementa um firewall de perímetro com política padrão
 `DROP` na cadeia `FORWARD` e libera explicitamente os fluxos necessários.
 
-Os testes e contadores do `iptables` demonstram principalmente:
+Os testes e contadores do `iptables` demonstram:
 
-1. A política padrão de bloqueio está ativa.
-2. O tráfego LAN → DMZ foi permitido.
-3. As respostas de conexões permitidas foram aceitas por
+1. A política padrão de bloqueio está ativa e, ao final, contabilizou os
+   pacotes descartados.
+2. O tráfego LAN → DMZ foi permitido, com `ping` do `pc1` para `web` e `dns`.
+3. O tráfego LAN → Internet foi permitido, com `ping` para `8.8.8.8` e
+   `curl` para `example.com`.
+4. As respostas de conexões permitidas foram aceitas por
    `ESTABLISHED,RELATED`.
-4. O acesso externo ao Web da DMZ é limitado à porta TCP/80.
-5. Não há regras permitindo novas conexões Internet → LAN.
-6. Não há regras permitindo novas conexões DMZ → LAN.
-
-As capturas de tela dos comandos e testes devem ser associadas às respectivas
-seções deste documento como evidências da implementação.
+5. O `r0` obteve `HTTP 200` no `web` da DMZ, e a regra TCP/80 registrou o
+   pacote.
+6. O `ping` do `r0` para o `pc1` foi bloqueado.
+7. O `ping` do `web` para o `pc1` foi bloqueado.
