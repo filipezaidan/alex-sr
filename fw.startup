@@ -1,26 +1,98 @@
-# interfaces
-ifconfig eth0 10.0.1.1/24
-ifconfig eth1 10.0.2.1/24
-ifconfig eth2 10.0.3.1/24
-ifconfig eth3 198.51.100.1/30
+# INTERFACES
 
-#  route r0 
+ifconfig eth0 10.0.1.1/24    # LAN
+ifconfig eth1 10.0.2.1/24    # DMZ
+ifconfig eth2 10.0.3.1/24    # GERENCIAMENTO
+ifconfig eth3 198.51.100.1/30 # WAN
+
+# ROUTE
 route add default gw 198.51.100.2
 
 
-#Firewall perimetro
+# INPUT / OUTPUT
+# Regras que protegem o proprio firewall
 
-# permite as respostas de conexões que já foram iniciadas e estão sendo estabelecidas.
-iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# permite conexões originadas na LAN para a Internet
-iptables -A FORWARD -i eth0 -o eth3 -m conntrack --ctstate NEW -j ACCEPT
+# SSH - permite acesso ao firewall
+iptables -A INPUT \
+    -p tcp --dport 22 \
+    -m conntrack --ctstate NEW,ESTABLISHED \
+    -j ACCEPT
 
-# permite conexões originadas na LAN para a DMZ
-iptables -A FORWARD -i eth0 -o eth1 -m conntrack --ctstate NEW -j ACCEPT
+iptables -A OUTPUT \
+    -p tcp --sport 22 \
+    -m conntrack --ctstate ESTABLISHED \
+    -j ACCEPT
 
-# permite conexões originadas na Internet para a Web da DMZ
-iptables -A FORWARD -i eth3 -o eth1 -p tcp --dport 80 -m conntrack --ctstate NEW -j ACCEPT
 
-#Politica padrao: bloquear todo resto
+# Loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+
+# Conexoes ja estabelecidas
+iptables -A INPUT \
+    -m conntrack --ctstate ESTABLISHED,RELATED \
+    -j ACCEPT
+
+iptables -A OUTPUT \
+    -m conntrack --ctstate ESTABLISHED,RELATED \
+    -j ACCEPT
+
+
+# Servicos oferecidos pelo proprio firewall
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+
+
+# Saida do proprio firewall
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+
+# FORWARD
+
+# Respostas de conexoes ja autorizadas
+iptables -A FORWARD \
+    -m conntrack --ctstate ESTABLISHED,RELATED \
+    -j ACCEPT
+
+
+# LAN -> DMZ
+iptables -A FORWARD \
+    -i eth0 -o eth1 \
+    -m conntrack --ctstate NEW \
+    -j ACCEPT
+
+# LAN -> Internet
+iptables -A FORWARD \
+    -i eth0 -o eth3 \
+    -m conntrack --ctstate NEW \
+    -j ACCEPT
+
+# Internet -> Web (DMZ)
+iptables -A FORWARD \
+    -i eth3 -o eth1 \
+    -p tcp --dport 80 \
+    -m conntrack --ctstate NEW \
+    -j ACCEPT
+
+# DNS da DMZ -> Internet
+iptables -A FORWARD \
+    -i eth1 -o eth3 \
+    -p udp --dport 53 \
+    -m conntrack --ctstate NEW \
+    -j ACCEPT
+
+iptables -A FORWARD \
+    -i eth1 -o eth3 \
+    -p tcp --dport 53 \
+    -m conntrack --ctstate NEW \
+    -j ACCEPT
+
+# POLITICA PADRAO
+
+iptables -P INPUT DROP
 iptables -P FORWARD DROP
+iptables -P OUTPUT DROP

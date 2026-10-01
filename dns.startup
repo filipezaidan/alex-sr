@@ -1,2 +1,10 @@
 ifconfig eth0 10.0.2.11/24
 route add default gw 10.0.2.1
+
+
+dnsmasq \
+    --no-daemon \
+    --interface=eth0 \
+    --listen-address=10.0.2.11 \
+    --server=8.8.8.8 \
+    >/tmp/dnsmasq.log 2>&1 &
