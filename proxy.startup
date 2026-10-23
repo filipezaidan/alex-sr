@@ -1,2 +1,10 @@
 ifconfig eth0 10.0.1.20/24
 route add default gw 10.0.1.1
+
+echo "nameserver 10.0.2.11" > /etc/resolv.conf
+
+# -N não solta o processo: o script só continua quando as pastas do cache terminam.
+# Sem -N, o squid -z devolve o shell com o PID ainda no ar e o daemon seguinte recusa subir.
+squid -z -N
+# Lê /etc/squid/squid.conf e escuta em 10.0.1.20:3128.
+squid
