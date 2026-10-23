@@ -188,7 +188,7 @@ num   pkts bytes target   prot  in    out    observação
 - **Regra 3**: LAN → DMZ (`ping` para `web` e `dns`).
 - **Regra 4**: Internet → Web na porta 80 (`curl` do `r0` retornou `HTTP 200`).
 
-> Evidências detalhadas com capturas de tela em [`steps/firewall/evidencias.md`](steps/firewall/evidencias.md).
+> Evidências detalhadas com capturas de tela em [`atv-1-firewall-dmz/steps/firewall/evidencias.md`](atv-1-firewall-dmz/steps/firewall/evidencias.md).
 
 ---
 
@@ -241,7 +241,7 @@ O `tcpdump -eni eth0 icmp` capturou os pacotes do `pc2` chegando ao `fw`, mas o 
 **Em quais condições o firewall enxerga o MAC original de `pc2`?**
 Apenas quando `pc2` e `fw` pertencem ao mesmo domínio de broadcast (mesma rede local / VLAN conectada à `eth0`). Se houvesse um roteador intermediário, o `fw` veria apenas o MAC desse roteador.
 
-> Evidências detalhadas em [`steps/l2/evidencias.md`](steps/l2/evidencias.md).
+> Evidências detalhadas em [`atv-1-firewall-dmz/steps/l2/evidencias.md`](atv-1-firewall-dmz/steps/l2/evidencias.md).
 
 ---
 
@@ -293,7 +293,7 @@ iptables -I FORWARD 1 -i eth0 -d 8.8.8.8 -j DROP
 
 Para controlar o acesso por nome de domínio, é necessário inspeção na camada de aplicação (filtro DNS, proxy HTTP/HTTPS ou NGFW).
 
-> Evidências detalhadas em [`steps/l3/evidencias.md`](steps/l3/evidencias.md).
+> Evidências detalhadas em [`atv-1-firewall-dmz/steps/l3/evidencias.md`](atv-1-firewall-dmz/steps/l3/evidencias.md).
 
 ---
 
@@ -344,7 +344,7 @@ O contadores no `fw` confirmaram que a regra capturou os pacotes destinados à f
 
 Bloquear portas identifica o transporte, não a aplicação. Conter o BitTorrent pelo comportamento exige inspeção de camada de aplicação (NGFW, DPI).
 
-> Evidências detalhadas em [`steps/l4/evidencias.md`](steps/l4/evidencias.md).
+> Evidências detalhadas em [`atv-1-firewall-dmz/steps/l4/evidencias.md`](atv-1-firewall-dmz/steps/l4/evidencias.md).
 
 ---
 
@@ -374,7 +374,7 @@ L7 → decide com base na requisição e no comportamento da aplicação
 
 **Limitações**: o WAF precisa compreender o protocolo da aplicação; tráfego criptografado (HTTPS) requer terminação TLS no WAF; pode gerar falsos positivos em aplicações complexas.
 
-> Pesquisa completa em [`steps/l7/controle-waf.md`](steps/l7/controle-waf.md).
+> Pesquisa completa em [`atv-1-firewall-dmz/steps/l7/controle-waf.md`](atv-1-firewall-dmz/steps/l7/controle-waf.md).
 
 ---
 
@@ -416,7 +416,7 @@ Internet
 
 **Defense in Depth** significa **não depender de uma única barreira**. Mesmo que o servidor Web seja comprometido, a **segmentação da rede**, o **firewall**, as **regras de filtragem stateful** e os **controles nos próprios hosts** continuam funcionando como camadas adicionais de proteção. Se uma camada falha, as outras ainda limitam o ataque.
 
-> Análise completa em [`steps/defense-in-depth/doc.md`](steps/defense-in-depth/doc.md).
+> Análise completa em [`atv-1-firewall-dmz/steps/defense-in-depth/doc.md`](atv-1-firewall-dmz/steps/defense-in-depth/doc.md).
 
 ---
 
@@ -475,25 +475,21 @@ Internet
 ├── web.startup                  # Configuração do servidor web
 ├── dns.startup                  # Configuração do servidor DNS
 ├── adm.startup                  # Configuração da estação de gerenciamento
-├── docs/
-│   ├── plan.md                  # Plano de execução das tarefas
-│   └── topologia.png            # Imagem da topologia
-└── steps/
-    ├── firewall/
-    │   ├── evidencias.md        # Evidências do firewall de perímetro
-    │   └── *.png                # Capturas de tela
-    ├── l2/
-    │   └── evidencias.md        # Evidências do bloqueio por MAC
-    ├── l3/
-    │   ├── evidencias.md        # Evidências de ICMP e bloqueio por IP
-    │   └── *.png                # Capturas de tela
-    ├── l4/
-    │   ├── evidencias.md        # Evidências do bloqueio por porta
-    │   └── *.png                # Capturas de tela
-    ├── l7/
-    │   └── controle-waf.md      # Pesquisa sobre WAF (L7)
-    └── defense-in-depth/
-        └── doc.md               # Análise de Defense in Depth
+├── atv-1-firewall-dmz/
+│   ├── docs/                    # Plano e figuras da atividade 1
+│   ├── scenarios/               # Roteiros de demonstração
+│   └── steps/                   # Evidências por etapa
+│       ├── firewall/
+│       ├── l2/
+│       ├── l3/
+│       ├── l4/
+│       ├── l7/
+│       └── defense-in-depth/
+└── atv-2-proxy-rp/
+    ├── docs/                    # Plano e figuras da atividade 2
+    └── steps/                   # Evidências por etapa
+        ├── 01-baseline/
+        └── 02-topologia/
 ```
 
 ---

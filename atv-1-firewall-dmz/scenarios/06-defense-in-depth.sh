@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-LAB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LAB_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
 echo "=== CENARIO 06 - DEFENSE IN DEPTH ==="
 

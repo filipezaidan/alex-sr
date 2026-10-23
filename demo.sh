@@ -60,42 +60,42 @@ while true; do
         1)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/01-perimetro.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/01-perimetro.sh"
             fi
             ;;
 
         2)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/02-l2-mac.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/02-l2-mac.sh"
             fi
             ;;
 
         3)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/03-l3-rede.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/03-l3-rede.sh"
             fi
             ;;
 
         4)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/04-l4-portas.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/04-l4-portas.sh"
             fi
             ;;
 
         5)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/05-l7-waf.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/05-l7-waf.sh"
             fi
             ;;
 
         6)
             if start_lab; then
                 echo
-                bash "$LAB_DIR/scenarios/06-defense-in-depth.sh"
+                bash "$LAB_DIR/atv-1-firewall-dmz/scenarios/06-defense-in-depth.sh"
             fi
             ;;
 

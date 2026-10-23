@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-LAB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LAB_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
 echo
 echo "[1] Subindo HTTP 6881 e 8080"
