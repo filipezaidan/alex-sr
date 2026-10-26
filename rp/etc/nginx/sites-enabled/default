@@ -2,13 +2,34 @@
 # O cliente fala com o rp e nao precisa saber o endereco do servidor de aplicacao.
 
 server {
+    # Endereco e porta que o cliente ve. O web nao aparece aqui.
     listen 80 default_server;
     listen [::]:80 default_server;
 
+    # Qualquer Host: nao ha virtual host por nome neste laboratorio.
     server_name _;
 
+    # Controle de metodo: so GET e HEAD.
+    # O if roda antes de qualquer location, entao POST, PUT, DELETE moram aqui.
+    # return dentro de if e um dos poucos usos seguros no NGINX.
+    if ($request_method !~ ^(GET|HEAD)$) {
+        return 405; # Method Not Allowed, gerado pelo rp, sem consultar o web
+    }
+
+    # Controle de caminho: /admin nao e publicado.
+    # Localizacao exata (=) tem precedencia sobre o prefixo "/".
+    location = /admin {
+        return 403; # Forbidden, gerado pelo rp, sem consultar o web
+    }
+
+    # O web serve /admin/ como diretorio; negar tambem para nao vazar por essa porta.
+    location /admin/ {
+        return 403;
+    }
+
+    # Todo o resto e encaminhado ao web.
     location / {
-        # Encaminha para o web. Sem proxy_pass, o NGINX responderia do proprio disco.
+        # Sem proxy_pass, o NGINX responderia do proprio disco.
         proxy_pass http://10.0.2.10:80;
 
         # O web passa a ver o rp como cliente: origem 10.0.2.20, Host o que foi pedido.
