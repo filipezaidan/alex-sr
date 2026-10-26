@@ -98,10 +98,12 @@ iptables -A FORWARD \
     -m conntrack --ctstate NEW \
     -j ACCEPT
 
-# Internet -> Web (DMZ)
+# Internet -> rp (DMZ). Destino fixo no NGINX: pacote novo para 10.0.2.10:80
+# nao e mais aceito e cai na politica DROP. O trafego rp -> web nao passa
+# pela FORWARD: os dois estao no mesmo cabo B, o switch entrega local.
 iptables -A FORWARD \
     -i eth3 -o eth1 \
-    -p tcp --dport 80 \
+    -p tcp -d 10.0.2.20 --dport 80 \
     -m conntrack --ctstate NEW \
     -j ACCEPT
 

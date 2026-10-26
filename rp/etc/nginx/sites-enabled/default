@@ -1,0 +1,18 @@
+# Publica o web (10.0.2.10:80) no endereco do rp (10.0.2.20:80).
+# O cliente fala com o rp e nao precisa saber o endereco do servidor de aplicacao.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    location / {
+        # Encaminha para o web. Sem proxy_pass, o NGINX responderia do proprio disco.
+        proxy_pass http://10.0.2.10:80;
+
+        # O web passa a ver o rp como cliente: origem 10.0.2.20, Host o que foi pedido.
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
