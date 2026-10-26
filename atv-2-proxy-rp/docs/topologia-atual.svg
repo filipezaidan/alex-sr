@@ -130,7 +130,7 @@
     <text x="430" y="836" text-anchor="middle" fill="#2b8a3e" font-size="16" font-weight="700">proxy</text>
     <text x="430" y="856" text-anchor="middle" fill="#495057" font-size="13">10.0.1.20/24</text>
     <text x="430" y="874" text-anchor="middle" fill="#495057" font-size="12">gw 10.0.1.1</text>
-    <text x="430" y="892" text-anchor="middle" fill="#2b8a3e" font-size="12">Squid, ainda sem servico</text>
+    <text x="430" y="892" text-anchor="middle" fill="#2b8a3e" font-size="12">Squid :3128, proxy explicito</text>
   </g>
 
   <g filter="url(#soft)" font-family="Segoe UI, Arial, sans-serif">
@@ -149,7 +149,7 @@
     </g>
     <text x="650" y="850" text-anchor="middle" fill="#1864ab" font-size="16" font-weight="700">rp</text>
     <text x="650" y="870" text-anchor="middle" fill="#495057" font-size="13">10.0.2.20/24</text>
-    <text x="650" y="888" text-anchor="middle" fill="#1864ab" font-size="12">NGINX, ainda sem servico</text>
+    <text x="650" y="888" text-anchor="middle" fill="#1864ab" font-size="12">NGINX :80, publica o web</text>
     <text x="650" y="906" text-anchor="middle" fill="#495057" font-size="12">gw 10.0.2.1</text>
 
     <g filter="url(#tiny)">
@@ -199,7 +199,7 @@
     <text x="1440" y="180" fill="#2b8a3e" font-size="14">proxy  10.0.1.20/24  cabo A</text>
     <text x="1440" y="204" fill="#1864ab" font-size="14">rp  10.0.2.20/24  cabo B</text>
     <text x="1440" y="228" fill="#495057" font-size="13">web continua em 10.0.2.10.</text>
-    <text x="1440" y="252" fill="#495057" font-size="13">Squid e NGINX ainda nao sobem.</text>
+    <text x="1440" y="252" fill="#495057" font-size="13">Squid na 3128, NGINX na 80.</text>
 
     <text x="1440" y="296" fill="#0b3a4a" font-size="18" font-weight="700">Interfaces do fw</text>
     <text x="1440" y="324" fill="#2b8a3e" font-size="14">eth0  cabo A  LAN  10.0.1.1/24</text>
@@ -207,24 +207,24 @@
     <text x="1440" y="372" fill="#d9480f" font-size="14">eth2  cabo C  ger&#234;ncia  10.0.3.1/24</text>
     <text x="1440" y="396" fill="#364fc7" font-size="14">eth3  cabo D  r0  198.51.100.1/30</text>
 
-    <text x="1440" y="440" fill="#0b3a4a" font-size="18" font-weight="700">O que o teste mostrou</text>
-    <text x="1440" y="468" fill="#2b8a3e" font-size="14">proxy alcanca pc1 no cabo A.</text>
-    <text x="1440" y="492" fill="#1864ab" font-size="14">rp alcanca web no cabo B.</text>
-    <text x="1440" y="516" fill="#c92a2a" font-size="14">Ping ao IP do fw cai na INPUT.</text>
-    <text x="1440" y="540" fill="#495057" font-size="13">Esse trecho nao passa pela FORWARD.</text>
+    <text x="1440" y="440" fill="#0b3a4a" font-size="18" font-weight="700">O que os testes mostraram</text>
+    <text x="1440" y="468" fill="#2b8a3e" font-size="14">LAN sai para a Internet so pelo Squid.</text>
+    <text x="1440" y="492" fill="#1864ab" font-size="14">example.com cai em 403 por dstdomain.</text>
+    <text x="1440" y="516" fill="#c92a2a" font-size="14">Cache: TCP_MISS e depois TCP_MEM_HIT.</text>
+    <text x="1440" y="540" fill="#495057" font-size="13">HTTPS passa por tunel e nao e cacheado.</text>
 
-    <text x="1440" y="584" fill="#0b3a4a" font-size="18" font-weight="700">FORWARD ainda da atividade 1</text>
+    <text x="1440" y="584" fill="#0b3a4a" font-size="18" font-weight="700">FORWARD no fim da atividade</text>
     <text x="1440" y="612" fill="#212529" font-size="14">Pol&#237;tica padr&#227;o: DROP</text>
-    <text x="1440" y="636" fill="#2b8a3e" font-size="14">LAN para Internet, eth0 para eth3</text>
-    <text x="1440" y="660" fill="#2b8a3e" font-size="14">Internet para DMZ, TCP/80</text>
-    <text x="1440" y="684" fill="#c92a2a" font-size="14">Essa regra ainda alcanca o web direto.</text>
+    <text x="1440" y="636" fill="#2b8a3e" font-size="14">LAN para Internet: 80/443 s&#243; do proxy</text>
+    <text x="1440" y="660" fill="#2b8a3e" font-size="14">Internet para DMZ: 80 s&#243; ate 10.0.2.20</text>
+    <text x="1440" y="684" fill="#c92a2a" font-size="14">Sem regra eth1 -&gt; eth0: DMZ n&#227;o inicia.</text>
 
     <rect x="1440" y="720" width="372" height="180" rx="12" fill="#f8f9fa" stroke="#dee2e6"/>
-    <text x="1460" y="752" fill="#0b3a4a" font-size="15" font-weight="700">Fluxo previsto</text>
-    <text x="1460" y="780" fill="#212529" font-size="13">Saida: pc para proxy para fw para Internet.</text>
-    <text x="1460" y="804" fill="#212529" font-size="13">Entrada: Internet para fw para rp para web.</text>
+    <text x="1460" y="752" fill="#0b3a4a" font-size="15" font-weight="700">Fluxo final</text>
+    <text x="1460" y="780" fill="#212529" font-size="13">Saida: pc -&gt; proxy:3128 -&gt; fw -&gt; Internet.</text>
+    <text x="1460" y="804" fill="#212529" font-size="13">Entrada: r0 -&gt; fw -&gt; rp:80 -&gt; web:80.</text>
     <text x="1460" y="828" fill="#495057" font-size="13">proxy e pc ficam no mesmo cabo.</text>
     <text x="1460" y="852" fill="#495057" font-size="13">rp e web tambem. O fw nao ve esse salto.</text>
-    <text x="1460" y="876" fill="#868e96" font-size="13">O bloqueio do web direto vem no NGINX.</text>
+    <text x="1460" y="876" fill="#868e96" font-size="13">Web direto da Internet cai no DROP do fw.</text>
   </g>
 </svg>

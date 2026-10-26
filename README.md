@@ -494,7 +494,7 @@ Internet
 └── atv-2-proxy-rp/
     ├── README.md                # Análise das barreiras e dos dois cenários de Defense in Depth
     ├── docs/                    # Plano e figuras da atividade 2
-    └── steps/                   # Evidências por etapa (01-baseline a 08-nginx-controles)
+    └── steps/                   # Evidências por etapa (01-baseline a 10-reprodutibilidade)
 ```
 
 ---

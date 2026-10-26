@@ -1,6 +1,11 @@
 ifconfig eth0 10.0.2.10/24
 route add default gw 10.0.2.1
 
+# O conteudo vem da pasta web/, copiada para o container no lstart:
+#   /var/www/html/index.html  e  /var/www/html/admin/index.html
 cd /var/www/html
 
+# Servidor minimo, escolhido de proposito: nao tem cache, nao filtra metodo,
+# nao nega caminho. Registra cada requisicao em /tmp/http-80.log, que e a
+# evidencia de quem chegou ate ele (o rp aparece como 10.0.2.20).
 python3 -m http.server 80 >/tmp/http-80.log 2>&1 &
