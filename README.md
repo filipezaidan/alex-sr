@@ -2,6 +2,8 @@
 
 > Laboratório Kathará que implementa um Cyber Range para experimentar conceitos fundamentais de Cibersegurança: Segurança de Perímetro, Firewall, DMZ, segmentação de redes, Default Deny, controles em diferentes camadas TCP/IP e Defense in Depth.
 
+> Este documento cobre a atividade 1 (firewall e DMZ). A atividade 2, de proxy, está em [`atv-2-proxy-rp/README.md`](atv-2-proxy-rp/README.md).
+
 **Instituto Federal de Alagoas — Segurança de Redes**
 
 ---
@@ -485,11 +487,14 @@ Internet
 │       ├── l4/
 │       ├── l7/
 │       └── defense-in-depth/
+├── proxy/etc/squid/             # squid.conf com as ACLs de cliente e domínio
+├── rp/etc/nginx/                # site do NGINX: proxy_pass, /admin, métodos
+├── web/var/www/html/            # conteúdo servido pelo web (inclui /admin)
+├── images/                      # Dockerfiles das imagens kathara/proxy-squid e kathara/rp-nginx
 └── atv-2-proxy-rp/
+    ├── README.md                # Análise das barreiras e dos dois cenários de Defense in Depth
     ├── docs/                    # Plano e figuras da atividade 2
-    └── steps/                   # Evidências por etapa
-        ├── 01-baseline/
-        └── 02-topologia/
+    └── steps/                   # Evidências por etapa (01-baseline a 08-nginx-controles)
 ```
 
 ---
