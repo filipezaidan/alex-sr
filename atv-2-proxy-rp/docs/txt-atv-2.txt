@@ -1,0 +1,290 @@
+Defense in Depth II: Proxy, Reverse Proxy e Segurança em Camadas
+
+Status
+
+Tipo
+
+Grupo
+
+Data de início
+
+08/10/2026
+
+Data final
+
+22/10/2026
+
+Descrição
+
+Desafio
+Na Task anterior, construímos nosso primeiro perímetro de segurança:
+
+Internet → Firewall → DMZ / LAN
+
+O Firewall passou a controlar quem pode se comunicar com quem, utilizando informações de diferentes camadas da pilha.
+
+Mas será que devemos depender somente dele?
+
+Nesta Task, vamos evoluir nosso pequeno Cyber Range, adicionando duas novas barreiras:
+
+Squid Proxy/Cache, controlando a navegação dos usuários da LAN para a Internet;
+
+NGINX Reverse Proxy, protegendo e intermediando o acesso da Internet aos serviços Web da DMZ.
+
+A arquitetura passará a implementar diferentes controles independentes — um passo importante em direção ao princípio de Defense in Depth (DiD).
+
+image
+1. Evolua a topologia
+Parta do laboratório desenvolvido na Task anterior e adicione dois novos nós:
+
+proxy — servidor Squid, localizado na LAN;
+
+rp — NGINX Reverse Proxy, localizado na DMZ.
+
+Atualize a figura da topologia anterior, acrescentando esses dois elementos.
+
+O fluxo conceitual deverá ser:
+
+Saída da organização:
+
+PCs → Squid → Firewall → Internet
+
+Entrada para os serviços Web:
+
+Internet → Firewall → NGINX → Web
+
+O servidor web continua na DMZ, porém não deverá mais ser diretamente exposto à Internet.
+
+Antes de implementar, atualize (se necessário) o plano de endereçamento e identifique claramente as zonas de segurança e os novos fluxos permitidos.
+
+2. Squid — controlando a saída
+Instale e configure o Squid no nó proxy.
+
+Configure pc1 e pc2 para utilizar o Squid como proxy HTTP/HTTPS e valide inicialmente o acesso à Web.
+
+Explore progressivamente pelo menos:
+
+funcionamento do Forward Proxy;
+
+controle de acesso por cliente;
+
+ACLs;
+
+bloqueio de domínios;
+
+logs de acesso;
+
+funcionamento do cache.
+
+Realize experimentos nos quais determinados destinos sejam permitidos e outros bloqueados.
+
+Depois, acesse repetidamente algum recurso e investigue:
+
+Como podemos determinar se determinado conteúdo foi realmente servido pelo cache?
+
+Utilize os logs e outras evidências fornecidas pelo Squid.
+
+Compare com a Task anterior
+
+
+
+Anteriormente bloqueamos um destino utilizando seu endereço IP no Firewall.
+
+Agora tente realizar uma política baseada no domínio utilizando o Squid.
+
+Compare as duas soluções.
+
+Por que o Squid consegue tomar decisões que seriam difíceis para um firewall trabalhando apenas em L3/L4?
+
+3. NGINX — protegendo a entrada
+Agora concentre-se no tráfego que percorre o caminho contrário.
+
+Na Task anterior:
+
+Internet → Firewall → Web
+
+Agora teremos:
+
+Internet → Firewall → NGINX → Web
+
+Instale o NGINX no nó rp e configure-o como Reverse Proxy para o servidor web.
+
+O cliente externo deverá acessar o endereço do Reverse Proxy. O NGINX encaminhará as requisições permitidas para o servidor Web.
+
+Depois de validar o funcionamento, altere as regras do Firewall:
+
+A Internet não deverá mais conseguir estabelecer uma conexão diretamente com web.
+
+Somente rp deverá poder encaminhar requisições para o servidor Web.
+
+Valide tanto o caminho permitido quanto uma tentativa de acesso direto ao servidor.
+
+4. Explore controles no Reverse Proxy
+Agora explore o NGINX como uma nova barreira de segurança.
+
+Escolha e implemente pelo menos dois controles. Exemplos:
+
+bloquear determinado caminho, como /admin;
+
+permitir /admin apenas para determinada rede;
+
+limitar métodos HTTP;
+
+adicionar autenticação;
+
+aplicar rate limiting;
+
+limitar tamanho de requisições;
+
+adicionar headers de segurança;
+
+registrar e analisar requisições suspeitas.
+
+A escolha faz parte da atividade: sinta-se livre pra incrementar. 
+
+Não se limite aos exemplos apresentados aqui.
+
+
+
+
+
+5. Defense in Depth — ataque cada barreira mentalmente
+Observe como nossa arquitetura evoluiu.
+
+Na primeira versão, tínhamos essencialmente:
+
+Internet → Firewall → Web
+
+Agora temos:
+
+Internet → Firewall → Reverse Proxy → Web
+
+e, no sentido contrário:
+
+PC → Forward Proxy → Firewall → Internet
+
+Cada elemento possui responsabilidades e informações diferentes para tomar decisões.
+
+Analise pelo menos dois cenários:
+
+Se uma regra do Firewall permitir acidentalmente tráfego HTTP externo, o NGINX ainda consegue proteger determinados recursos da aplicação?
+
+Se web for comprometido, quais barreiras dificultam que o atacante alcance a LAN ou outros sistemas?
+
+A ideia central de Defense in Depth começa a ficar mais concreta:
+
+Não queremos uma barreira perfeita. Queremos múltiplas barreiras complementares, de forma que a falha ou comprometimento de uma delas não signifique automaticamente o comprometimento de toda a infraestrutura.
+
+SRL — Você é responsável por parte do caminho
+Nesta Task, nem todas as configurações necessárias serão fornecidas por mim
+
+
+
+Antes e durante a implementação, identifique:
+
+
+
+O que eu já sei? → O que preciso descobrir? → Onde posso encontrar essa informação? → Como posso verificar se a solução encontrada realmente funciona?
+
+
+
+Utilize diferentes fontes para construir sua solução:
+
+documentação oficial;
+
+livros e artigos;
+
+tutoriais;
+
+vídeos;
+
+fóruns e comunidades;
+
+colegas;
+
+ferramentas de IA Generativa.
+
+GenAI pode ser utilizada para explicar conceitos, sugerir configurações, interpretar erros ou auxiliar no troubleshooting. Entretanto:
+
+Uma resposta gerada por IA não é uma evidência de que a configuração está correta. Cuidado com o Offload Cognitivo - tenha certeza que vc está internalizando aquilo que está sendo trabalho na disciplina. 
+
+Teste as soluções no laboratório, observe o tráfego, consulte logs e confronte informações importantes com outras fontes.
+
+Desafio de investigação
+Durante a implementação, procure responder:
+
+Firewall, Forward Proxy e Reverse Proxy fazem a mesma coisa?
+
+Investigue onde cada um está posicionado, qual tráfego observa, quais informações consegue utilizar para tomar decisões e o que acontece se ele falhar.
+
+Ao final, vocês deverão ser capazes de explicar por que estamos mantendo os três componentes em vez de simplesmente substituir o Firewall por um Proxy.
+
+Entrega
+
+Restrições
+
+Sem restrições
+
+Descrição da entrega
+
+Entregas
+Entregue um único repositório Git contendo:
+
+Lab Kathará completo, executável com kathara lstart, incluindo fw, proxy, rp e os demais nós;
+
+configurações do Firewall, Squid e NGINX, devidamente comentadas;
+
+figura atualizada da topologia, mostrando zonas, novos componentes e principais fluxos;
+
+README.md com evidências objetivas de:
+
+acesso LAN → Squid → Internet;
+
+bloqueio de domínio pelo Squid;
+
+funcionamento do cache;
+
+acesso Internet → NGINX → Web;
+
+bloqueio do acesso direto Internet → Web;
+
+dois controles adicionais implementados no NGINX;
+
+análise dos cenários de Defense in Depth.
+
+Registro de aprendizagem — SRL
+Inclua no README.md uma pequena seção “Como aprendemos”, registrando:
+
+Dúvida/Problema → Fonte consultada → O que aprendemos → Como validamos no laboratório
+
+Não é necessário escrever um relatório extenso. Registre as fontes que realmente contribuíram para resolver problemas ou tomar decisões, incluindo prompts relevantes utilizados com GenAI.
+
+Finalize com uma reflexão curta:
+
+Qual foi a principal coisa que tivemos que aprender por conta própria nesta Task?
+
+Qual fonte foi mais útil e por quê?
+
+Alguma solução encontrada na Internet ou sugerida por GenAI estava errada, incompleta ou não funcionou? Como descobrimos?
+
+O que faríamos de maneira diferente se tivéssemos que realizar a Task novamente?
+
+Critério de conclusão
+Ao final, o grupo deve conseguir demonstrar experimentalmente a evolução:
+
+Firewall
+→ controla principalmente fluxos entre redes
+
++ Squid
+→ adiciona controle sobre acesso dos usuários a serviços Web externos
+
++ NGINX Reverse Proxy
+→ adiciona controle sobre como serviços Web internos são expostos
+
+= Defense in Depth
+
+Mais importante do que configurar três ferramentas é conseguir explicar:
+
+Qual problema cada camada resolve, quais são suas limitações e qual outra camada continua protegendo a infraestrutura quando uma delas falha.
+
+Essa última pergunta é o núcleo da Task — e também deixa um gancho muito bom para a próxima evolução do laboratório: adicionar observabilidade e detecção (IDS/IPS, como Suricata), fazendo a progressão de prevenir → observar → detectar → responder.

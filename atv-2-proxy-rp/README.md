@@ -159,3 +159,13 @@ A barreira útil depende de onde o atacante está. Fora da rede, firewall e NGIN
 | Por que não existe regra `rp → web` na `FORWARD`? | documentação do Kathará (collision domain = L2) | `FORWARD` só vê pacote que cruza interface                                             | `rp → web` responde `200` sem nenhuma regra; `r0 → web` cai no `DROP`                                             |
 | Como instalar Squid e NGINX de forma persistente? | documentação do Kathará (pasta do nó, imagens)  | a pasta com o nome do nó é copiada no start; `Dockerfile` dentro dela não é construído | `apt install` no terminal sumiu no `lclean`; com imagem declarada no `lab.conf`, os binários voltaram no `lstart` |
 | Como trocar uma regra sem reordenar a cadeia?     | `iptables(8)`, opção `-R`                       | `-R FORWARD n` substitui na posição                                                    | `iptables -S FORWARD` mostra a cadeia com a mesma ordem e a regra nova no lugar                                   |
+
+### Reflexão
+
+**O que tivemos que aprender por conta própria.** Os conceitos de firewall, proxy e proxy reverso, o papel de cada um e a diferença entre eles. Também como preparar o Kathará para os dois serviços: imagem do nó, arquivo de configuração copiado no `lstart` e o processo subindo no `.startup`.
+
+**A fonte mais útil.** O YouTube. Dá para ver, com exemplo, o que cada um dos três faz e onde entra no caminho do pacote. Texto de manual explica a diretiva; o vídeo mostra a diferença entre encaminhar uma zona, buscar um site para o cliente e publicar um serviço.
+
+**Solução de fora que não funcionou.** A implementação de cada etapa foi guiada com GenAI. No conjunto, a configuração sugerida funcionou no laboratório: o acesso pelo Squid, o bloqueio de domínio, o cache, o NGINX e os dois controles fecharam com o log e com o código HTTP que a etapa pedia.
+
+**O que faríamos diferente.** Antes de subir a topologia desenhada na atividade, a gente pararia para perguntar se aquele desenho é o adequado ou se dá para melhorar. Agora o papel de cada nó está mais claro, e essa pergunta viria antes do `lab.conf`.
